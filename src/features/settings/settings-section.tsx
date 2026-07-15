@@ -1,0 +1,251 @@
+﻿"use client";
+import Link from "next/link";
+import { useState, type ChangeEvent, type FormEvent } from "react";
+import { Badge, Button, Icon, Input, List, ListItem, useTheme, type IconName, type ThemePreference } from "@/design-system";
+import { Screen } from "@/components/screen";
+import { currentIsoDate, formatMoney, newId, type AppData, type Category, type Goal, type Person, type Recurrence, type RecurrenceMovementType, type Subcategory } from "@/lib/app-data";
+import { useAppStore } from "@/lib/app-store";
+import styles from "../shared.module.css";
+
+const themeOptions: Array<{ value: ThemePreference; label: string }> = [
+  { value: "light", label: "Mode clar" }, { value: "dark", label: "Mode fosc" }, { value: "system", label: "Mode automÃ tic" },
+];
+const recurrenceTypes: Array<{ value: RecurrenceMovementType; label: string }> = [
+  { value: "expense", label: "Despesa" }, { value: "income", label: "IngrÃ©s" }, { value: "transfer", label: "TransferÃ¨ncia" },
+  { value: "goalContribution", label: "AportaciÃ³ a objectiu" }, { value: "goalWithdrawal", label: "Retirada dâ€™objectiu" },
+];
+const colors = [["blue", "Blau"], ["violet", "Violeta"], ["green", "Verd"], ["orange", "Taronja"]];
+const icons: Array<[IconName, string]> = [["wallet", "Cartera"], ["shopping", "Compres"], ["transport", "Transport"], ["income", "IngrÃ©s"], ["saving", "Estalvi"], ["goal", "Objectiu"], ["filter", "Filtre"]];
+type BackupFile = { formatVersion?: number; exportedAt?: string; data?: AppData };
+
+const isAppData = (value: unknown): value is AppData => {
+  const data = value as AppData;
+  return Boolean(data && data.version === 1 && Array.isArray(data.people) && Array.isArray(data.accounts) && Array.isArray(data.movements) && Array.isArray(data.recurrences));
+};
+const extractBackupData = (value: unknown) => isAppData(value) ? value : isAppData((value as BackupFile)?.data) ? (value as BackupFile).data! : null;
+
+function RecurrenceForm({ recurrence, onCancel }: { recurrence?: Recurrence; onCancel: () => void }) {
+  const { data, update } = useAppStore();
+  const [movementType, setMovementType] = useState<RecurrenceMovementType>(recurrence?.movementType ?? "expense");
+  const [categoryId, setCategoryId] = useState(recurrence?.categoryId ?? "");
+  const accounts = data.accounts.filter((account) => !account.archived || account.id === recurrence?.sourceAccountId || account.id === recurrence?.destinationAccountId);
+  const categories = data.categories.filter((category) => !category.archived || category.id === recurrence?.categoryId);
+  const subs = data.subcategories.filter((item) => item.categoryId === categoryId && (!item.archived || item.id === recurrence?.subcategoryId));
+  const activeGoals = data.goals.filter((goal) => !goal.archived || goal.id === recurrence?.linkedGoalId);
+  const needsSource = movementType !== "income";
+  const needsDestination = movementType !== "expense";
+  const isGoal = movementType === "goalContribution" || movementType === "goalWithdrawal";
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const now = currentIsoDate();
+    const saved: Recurrence = {
+      id: recurrence?.id ?? newId("rec"),
+      name: String(form.get("name") || "").trim(),
+      movementType,
+      amount: Number(form.get("amount")),
+      sourceAccountId: needsSource ? String(form.get("sourceAccountId") || "") : undefined,
+      destinationAccountId: needsDestination ? String(form.get("destinationAccountId") || "") : undefined,
+      categoryId: movementType === "expense" || movementType === "income" ? String(form.get("categoryId") || "") || undefined : undefined,
+      subcategoryId: movementType === "expense" ? String(form.get("subcategoryId") || "") || undefined : undefined,
+      linkedGoalId: isGoal ? String(form.get("linkedGoalId") || "") || undefined : undefined,
+      dayOfMonth: Math.min(31, Math.max(1, Number(form.get("dayOfMonth")) || 1)),
+      frequency: "monthly",
+      startDate: String(form.get("startDate") || now),
+      endDate: String(form.get("endDate") || "") || undefined,
+      isActive: form.get("isActive") === "on",
+      lastGeneratedAt: recurrence?.lastGeneratedAt,
+      createdAt: recurrence?.createdAt ?? now,
+      updatedAt: now,
+    };
+    if (!saved.name || !(saved.amount > 0) || (needsSource && !saved.sourceAccountId) || (needsDestination && !saved.destinationAccountId)) return;
+    update((current) => ({ ...current, recurrences: recurrence ? current.recurrences.map((item) => item.id === recurrence.id ? saved : item) : [...current.recurrences, saved] }));
+    onCancel();
+  }
+  return <article className={styles.statCard}><form className={styles.form} onSubmit={submit}>
+    <Input label="Nom" name="name" defaultValue={recurrence?.name} required />
+    <Input label="Import" name="amount" type="number" min="0.01" step="0.01" defaultValue={recurrence?.amount} required />
+    <label className={styles.selectField}>Tipus<select value={movementType} onChange={(event) => setMovementType(event.target.value as RecurrenceMovementType)}>{recurrenceTypes.map((type) => <option value={type.value} key={type.value}>{type.label}</option>)}</select></label>
+    {needsSource && <label className={styles.selectField}>Compte origen<select name="sourceAccountId" defaultValue={recurrence?.sourceAccountId} required><option value="">Selecciona...</option>{accounts.map((account) => <option value={account.id} key={account.id}>{account.name}{account.archived ? " Â· arxivat" : ""}</option>)}</select></label>}
+    {needsDestination && <label className={styles.selectField}>Compte destÃ­<select name="destinationAccountId" defaultValue={recurrence?.destinationAccountId} required><option value="">Selecciona...</option>{accounts.map((account) => <option value={account.id} key={account.id}>{account.name}{account.archived ? " Â· arxivat" : ""}</option>)}</select></label>}
+    {(movementType === "expense" || movementType === "income") && <label className={styles.selectField}>Categoria<select name="categoryId" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="">Sense categoria</option>{categories.map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>}
+    {movementType === "expense" && <label className={styles.selectField}>Subcategoria<select name="subcategoryId" defaultValue={recurrence?.subcategoryId}><option value="">Sense subcategoria</option>{subs.map((subcategory) => <option value={subcategory.id} key={subcategory.id}>{subcategory.name}</option>)}</select></label>}
+    {isGoal && <label className={styles.selectField}>Objectiu<select name="linkedGoalId" defaultValue={recurrence?.linkedGoalId}><option value="">Sense objectiu</option>{activeGoals.map((goal) => <option value={goal.id} key={goal.id}>{goal.name}{goal.archived ? " Â· arxivat" : ""}</option>)}</select></label>}
+    <Input label="Dia del mes" name="dayOfMonth" type="number" min="1" max="31" defaultValue={recurrence?.dayOfMonth ?? 1} required />
+    <Input label="Data dâ€™inici" name="startDate" type="date" defaultValue={recurrence?.startDate ?? currentIsoDate()} required />
+    <Input label="Data de finalitzaciÃ³" name="endDate" type="date" defaultValue={recurrence?.endDate} />
+    <label className={styles.checkbox}><input type="checkbox" name="isActive" defaultChecked={recurrence?.isActive ?? true} /> RecurrÃ¨ncia activa</label>
+    <div className={styles.formActions}><Button variant="secondary" fullWidth onClick={onCancel}>CancelÂ·la</Button><Button type="submit" fullWidth>{recurrence ? "Desa canvis" : "Crea recurrÃ¨ncia"}</Button></div>
+  </form></article>;
+}
+
+function RecurrencesSettings() {
+  const { data, update } = useAppStore();
+  const [editing, setEditing] = useState<Recurrence | "new" | null>(null);
+  const [message, setMessage] = useState("");
+  const active = data.recurrences.filter((recurrence) => recurrence.isActive).length;
+  if (editing) return <Screen title={editing === "new" ? "Nova recurrÃ¨ncia" : "Edita recurrÃ¨ncia"} eyebrow="Moviments recurrents" backHref="/configuracio/recurrencies"><RecurrenceForm recurrence={editing === "new" ? undefined : editing} onCancel={() => setEditing(null)} /></Screen>;
+  return <Screen title="Moviments recurrents" eyebrow={`${active} recurrÃ¨ncies actives`} backHref="/configuracio" action={<Button leadingIcon={<Icon name="add" />} onClick={() => setEditing("new")}>Crear</Button>}>
+    {message && <p className={styles.successCard} role="status">{message}</p>}
+    <div className={styles.listCard}>{!data.recurrences.length && <p className={styles.empty}>Encara no hi ha recurrÃ¨ncies.</p>}{data.recurrences.map((recurrence) => {
+      const generated = data.movements.some((movement) => movement.recurrenceId === recurrence.id);
+      return <article className={styles.movement} key={recurrence.id}><span className={styles.movementIcon}><Icon name={recurrence.movementType === "income" ? "income" : recurrence.movementType === "expense" ? "shopping" : recurrence.movementType === "transfer" ? "transfer" : "saving"} /></span><div><b>{recurrence.name}</b><small>{formatMoney(recurrence.amount)} Â· dia {recurrence.dayOfMonth}{generated ? " Â· amb historial" : ""}</small></div><aside><Badge tone={recurrence.isActive ? "success" : "neutral"}>{recurrence.isActive ? "Activa" : "Inactiva"}</Badge><span className={styles.rowActions}><button onClick={() => setEditing(recurrence)}>Edita</button><button onClick={() => update((current) => ({ ...current, recurrences: current.recurrences.map((item) => item.id === recurrence.id ? { ...item, isActive: !item.isActive, updatedAt: currentIsoDate() } : item) }))}>{recurrence.isActive ? "Desactiva" : "Activa"}</button><button onClick={() => { const text = generated ? "Aquesta recurrÃ¨ncia ja ha generat moviments. Eliminar la regla no eliminarÃ  els moviments existents. Vols continuar?" : "Vols eliminar definitivament aquesta recurrÃ¨ncia?"; if (confirm(text)) { update((current) => ({ ...current, recurrences: current.recurrences.filter((item) => item.id !== recurrence.id) })); setMessage(generated ? "RecurrÃ¨ncia eliminada. Els moviments generats es conserven." : "RecurrÃ¨ncia eliminada correctament."); } }}>Elimina</button></span></aside></article>;
+    })}</div>
+  </Screen>;
+}
+
+function BackupSettings() {
+  const { data, replaceData } = useAppStore();
+  const [message, setMessage] = useState("");
+  const exportBackup = () => {
+    const today = currentIsoDate();
+    const blob = new Blob([JSON.stringify({ formatVersion: 1, exportedAt: new Date().toISOString(), app: "Comptes", storage: "localStorage", data }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url; link.download = `comptes-backup-${today}.json`; link.click(); URL.revokeObjectURL(url);
+    setMessage("Copia de seguretat exportada. Desa aquest fitxer a iCloud Drive, Google Drive o una carpeta segura.");
+  };
+  const importBackup = async (event: ChangeEvent<HTMLInputElement>) => {
+    setMessage("");
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const imported = extractBackupData(JSON.parse(await file.text()) as unknown);
+      if (!imported) return setMessage("El fitxer no te el format correcte de copia de seguretat.");
+      if (!confirm("Importar una copia substituira les dades locals actuals. Exporta una copia abans d'importar. Vols continuar?")) return;
+      replaceData(imported);
+      setMessage("Copia importada correctament. Els saldos es recalculen amb les dades importades.");
+      event.target.value = "";
+    } catch { setMessage("No s'ha pogut importar el JSON."); }
+  };
+  return <Screen title="Copies de seguretat" eyebrow="Dades locals" backHref="/configuracio"><article className={styles.statCard}><p>Exporta totes les dades locals de Comptes: comptes, persones, categories, subcategories, objectius, recurrencies, moviments i configuracio. Guarda el fitxer a iCloud Drive, Google Drive o una carpeta segura.</p><div className={styles.noticeInline}><b>Abans d&apos;importar</b><p>Importar una copia substituira les dades locals actuals. Exporta una copia abans d&apos;importar.</p></div><div className={styles.settingsList}><Button onClick={exportBackup}>Exporta backup JSON</Button><Input label="Importar backup JSON" type="file" accept="application/json,.json" onChange={importBackup} /></div>{message && <p role="status">{message}</p>}</article></Screen>;
+}
+
+function InstallIPhoneSettings() {
+  return <Screen title="Instal·lar a iPhone" eyebrow="PWA" backHref="/configuracio"><article className={styles.statCard}><p>Quan Comptes estigui publicada, podras obrir-la a Safari i afegir-la a la pantalla d&apos;inici. Un cop instal·lada, les dades es guardaran localment al dispositiu i podras utilitzar-la encara que no tinguis connexio.</p><div className={styles.noticeInline}><b>Mode desenvolupament local</b><p>Nomes per proves: necessita l&apos;ordinador ences, el servidor local obert i l&apos;iPhone a la mateixa Wi-Fi.</p></div><div className={styles.noticeInline}><b>Mode final publicat</b><p>No necessita ordinador ences. S&apos;obre des de la URL publicada, es pot afegir a la pantalla d&apos;inici, desa les dades al dispositiu i pot funcionar offline despres d&apos;una primera carrega. Fes backups JSON sovint.</p></div><ol className={styles.instructions}><li>Obre Comptes a Safari.</li><li>Prem Compartir.</li><li>Tria &quot;Afegir a pantalla d&apos;inici&quot;.</li><li>Confirma.</li><li>Obre Comptes des de la icona.</li></ol></article></Screen>;
+}
+
+function PeopleSettings() {
+  const { data, update } = useAppStore();
+  const [editing, setEditing] = useState<Person | "new" | null>(null);
+  const [message, setMessage] = useState("");
+  const linked = (id: string) => data.accounts.some((account) => account.ownerIds.includes(id));
+  const save = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get("name") || "").trim();
+    if (!name) return;
+    const saved: Person = { id: editing && editing !== "new" ? editing.id : newId("person"), name, color: String(form.get("color") || "blue"), archived: editing && editing !== "new" ? editing.archived : false };
+    update((current) => ({ ...current, people: editing && editing !== "new" ? current.people.map((person) => person.id === saved.id ? saved : person) : [...current.people, saved] }));
+    setEditing(null); setMessage("Persona desada correctament.");
+  };
+  return <Screen title="Persones" eyebrow="Propietaris i participants" backHref="/configuracio" action={<Button leadingIcon={<Icon name="add" />} onClick={() => setEditing("new")}>Afegir</Button>}>
+    {editing && <article className={styles.statCard}><form className={styles.form} onSubmit={save}><Input label="Nom" name="name" defaultValue={editing === "new" ? "" : editing.name} required /><label className={styles.selectField}>Color<select name="color" defaultValue={editing === "new" ? "blue" : editing.color ?? "blue"}>{colors.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><div className={styles.formActions}><Button variant="secondary" fullWidth onClick={() => setEditing(null)}>CancelÂ·la</Button><Button type="submit" fullWidth>Desa</Button></div></form></article>}
+    {message && <p className={styles.successCard} role="status">{message}</p>}
+    <div className={styles.listCard}>{data.people.map((person) => {
+      const used = linked(person.id);
+      return <article className={styles.movement} key={person.id}><span className={styles.movementIcon}><Icon name="person" /></span><div><b>{person.name}</b><small>{used ? "Vinculada a comptes" : "Sense vincles"} Â· {person.archived ? "arxivada" : "activa"}</small></div><aside><Badge tone={person.archived ? "neutral" : "success"}>{person.archived ? "Arxivada" : "Activa"}</Badge><span className={styles.rowActions}><button onClick={() => setEditing(person)}>Edita</button><button onClick={() => update((current) => ({ ...current, people: current.people.map((item) => item.id === person.id ? { ...item, archived: !item.archived } : item) }))}>{person.archived ? "Desarxiva" : "Arxiva"}</button><button onClick={() => { if (used) return setMessage("No pots eliminar aquesta persona perquÃ¨ estÃ  vinculada a comptes. Pots arxivar-la."); if (confirm("Vols eliminar definitivament aquesta persona?")) { update((current) => ({ ...current, people: current.people.filter((item) => item.id !== person.id) })); setMessage("Persona eliminada correctament."); } }}>Elimina</button></span></aside></article>;
+    })}</div>
+  </Screen>;
+}
+
+function CategoriesSettings() {
+  const { data, update } = useAppStore();
+  const [editing, setEditing] = useState<Category | "new" | null>(null);
+  const [message, setMessage] = useState("");
+  const save = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get("name") || "").trim();
+    if (!name) return;
+    const saved: Category = { id: editing && editing !== "new" ? editing.id : newId("cat"), name, icon: String(form.get("icon") || "wallet") as IconName, color: String(form.get("color") || "blue"), kind: String(form.get("kind") || "expense") as Category["kind"], order: Number(form.get("order")) || data.categories.length + 1, archived: editing && editing !== "new" ? editing.archived : false };
+    update((current) => ({ ...current, categories: editing && editing !== "new" ? current.categories.map((category) => category.id === saved.id ? saved : category) : [...current.categories, saved] }));
+    setEditing(null); setMessage("Categoria desada correctament.");
+  };
+  return <Screen title="Categories" eyebrow="GestiÃ³ local" backHref="/configuracio" action={<Button leadingIcon={<Icon name="add" />} onClick={() => setEditing("new")}>Afegir</Button>}>
+    {editing && <article className={styles.statCard}><form className={styles.form} onSubmit={save}><Input label="Nom" name="name" defaultValue={editing === "new" ? "" : editing.name} required /><label className={styles.selectField}>Tipus<select name="kind" defaultValue={editing === "new" ? "expense" : editing.kind ?? "expense"}><option value="expense">Despesa</option><option value="income">IngrÃ©s</option><option value="both">AmbdÃ³s</option></select></label><label className={styles.selectField}>Color<select name="color" defaultValue={editing === "new" ? "blue" : editing.color ?? "blue"}>{colors.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><label className={styles.selectField}>Icona<select name="icon" defaultValue={editing === "new" ? "wallet" : editing.icon}>{icons.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><Input label="Ordre" name="order" type="number" defaultValue={editing === "new" ? data.categories.length + 1 : editing.order ?? 1} /><div className={styles.formActions}><Button variant="secondary" fullWidth onClick={() => setEditing(null)}>CancelÂ·la</Button><Button type="submit" fullWidth>Desa</Button></div></form></article>}
+    {message && <p className={styles.successCard} role="status">{message}</p>}
+    <div className={styles.listCard}>{[...data.categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((category) => {
+      const used = data.movements.some((movement) => movement.categoryId === category.id);
+      const hasSubcategories = data.subcategories.some((subcategory) => subcategory.categoryId === category.id);
+      return <article className={styles.movement} key={category.id}><span className={`${styles.movementIcon} ${styles[category.color ?? "blue"]}`}><Icon name={category.icon} /></span><div><b>{category.name}</b><small>{category.kind === "income" ? "IngrÃ©s" : category.kind === "both" ? "AmbdÃ³s" : "Despesa"} Â· {used ? "amb moviments" : hasSubcategories ? "amb subcategories" : "sense Ãºs"} Â· {category.archived ? "arxivada" : "activa"}</small></div><aside><Badge tone={category.archived ? "neutral" : "success"}>{category.archived ? "Arxivada" : "Activa"}</Badge><span className={styles.rowActions}><button onClick={() => setEditing(category)}>Edita</button><button onClick={() => update((current) => ({ ...current, categories: current.categories.map((item) => item.id === category.id ? { ...item, archived: !item.archived } : item) }))}>{category.archived ? "Desarxiva" : "Arxiva"}</button><button onClick={() => { if (used || hasSubcategories) return setMessage("No pots eliminar aquesta categoria perquÃ¨ ja tÃ© moviments o subcategories associades. Pots arxivar-la."); if (confirm("Vols eliminar definitivament aquesta categoria?")) { update((current) => ({ ...current, categories: current.categories.filter((item) => item.id !== category.id) })); setMessage("Categoria eliminada correctament."); } }}>Elimina</button></span></aside></article>;
+    })}</div>
+  </Screen>;
+}
+
+function SubcategoriesSettings() {
+  const { data, update } = useAppStore();
+  const [editing, setEditing] = useState<Subcategory | "new" | null>(null);
+  const [message, setMessage] = useState("");
+  const categoryOptions = data.categories.filter((category) => !category.archived || (editing !== "new" && editing?.categoryId === category.id));
+  const save = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get("name") || "").trim();
+    const categoryId = String(form.get("categoryId") || "");
+    if (!name || !categoryId) return;
+    const saved: Subcategory = { id: editing && editing !== "new" ? editing.id : newId("sub"), name, categoryId, order: Number(form.get("order")) || data.subcategories.length + 1, archived: editing && editing !== "new" ? editing.archived : false };
+    update((current) => ({ ...current, subcategories: editing && editing !== "new" ? current.subcategories.map((subcategory) => subcategory.id === saved.id ? saved : subcategory) : [...current.subcategories, saved] }));
+    setEditing(null); setMessage("Subcategoria desada correctament.");
+  };
+  return <Screen title="Subcategories" eyebrow="GestiÃ³ local" backHref="/configuracio" action={<Button leadingIcon={<Icon name="add" />} onClick={() => setEditing("new")} disabled={!data.categories.length}>Afegir</Button>}>
+    {editing && <article className={styles.statCard}><form className={styles.form} onSubmit={save}><Input label="Nom" name="name" defaultValue={editing === "new" ? "" : editing.name} required /><label className={styles.selectField}>Categoria pare<select name="categoryId" defaultValue={editing === "new" ? categoryOptions[0]?.id : editing.categoryId} required>{categoryOptions.map((category) => <option value={category.id} key={category.id}>{category.name}{category.archived ? " Â· arxivada" : ""}</option>)}</select></label><Input label="Ordre" name="order" type="number" defaultValue={editing === "new" ? data.subcategories.length + 1 : editing.order ?? 1} /><div className={styles.formActions}><Button variant="secondary" fullWidth onClick={() => setEditing(null)}>CancelÂ·la</Button><Button type="submit" fullWidth>Desa</Button></div></form></article>}
+    {message && <p className={styles.successCard} role="status">{message}</p>}
+    <div className={styles.listCard}>{[...data.subcategories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((subcategory) => {
+      const used = data.movements.some((movement) => movement.subcategoryId === subcategory.id);
+      const parent = data.categories.find((category) => category.id === subcategory.categoryId);
+      return <article className={styles.movement} key={subcategory.id}><span className={styles.movementIcon}><Icon name="filter" /></span><div><b>{subcategory.name}</b><small>{parent?.name ?? "Sense categoria"} Â· {used ? "amb moviments" : "sense Ãºs"} Â· {subcategory.archived ? "arxivada" : "activa"}</small></div><aside><Badge tone={subcategory.archived ? "neutral" : "success"}>{subcategory.archived ? "Arxivada" : "Activa"}</Badge><span className={styles.rowActions}><button onClick={() => setEditing(subcategory)}>Edita</button><button onClick={() => update((current) => ({ ...current, subcategories: current.subcategories.map((item) => item.id === subcategory.id ? { ...item, archived: !item.archived } : item) }))}>{subcategory.archived ? "Desarxiva" : "Arxiva"}</button><button onClick={() => { if (used) return setMessage("No pots eliminar aquesta subcategoria perquÃ¨ ja tÃ© moviments associats. Pots arxivar-la."); if (confirm("Vols eliminar definitivament aquesta subcategoria?")) { update((current) => ({ ...current, subcategories: current.subcategories.filter((item) => item.id !== subcategory.id) })); setMessage("Subcategoria eliminada correctament."); } }}>Elimina</button></span></aside></article>;
+    })}</div>
+  </Screen>;
+}
+
+function GoalsSettings() {
+  const { data, update } = useAppStore();
+  const [editing, setEditing] = useState<Goal | "new" | null>(null);
+  const [message, setMessage] = useState("");
+  const accountOptions = data.accounts.filter((account) => !account.archived || (editing !== "new" && editing?.accountId === account.id));
+  const save = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get("name") || "").trim();
+    const accountId = String(form.get("accountId") || "");
+    if (!name || !accountId) return;
+    const saved: Goal = { id: editing && editing !== "new" ? editing.id : newId("goal"), name, accountId, targetAmount: Number(form.get("targetAmount")) || 0, monthlyContribution: Number(form.get("monthlyContribution")) || 0, archived: editing && editing !== "new" ? editing.archived : false };
+    update((current) => ({ ...current, goals: editing && editing !== "new" ? current.goals.map((goal) => goal.id === saved.id ? saved : goal) : [...current.goals, saved] }));
+    setEditing(null); setMessage("Objectiu desat correctament.");
+  };
+  return <Screen title="Objectius" eyebrow="Fons i metes" backHref="/configuracio" action={<Button leadingIcon={<Icon name="add" />} onClick={() => setEditing("new")} disabled={!data.accounts.length}>Afegir</Button>}>
+    {editing && <article className={styles.statCard}><form className={styles.form} onSubmit={save}><Input label="Nom" name="name" defaultValue={editing === "new" ? "" : editing.name} required /><Input label="Import objectiu" name="targetAmount" type="number" step="0.01" defaultValue={editing === "new" ? 0 : editing.targetAmount} /><Input label="AportaciÃ³ mensual" name="monthlyContribution" type="number" step="0.01" defaultValue={editing === "new" ? 0 : editing.monthlyContribution ?? 0} /><label className={styles.selectField}>Compte vinculat<select name="accountId" defaultValue={editing === "new" ? accountOptions[0]?.id : editing.accountId} required>{accountOptions.map((account) => <option value={account.id} key={account.id}>{account.name}{account.archived ? " Â· arxivat" : ""}</option>)}</select></label><div className={styles.formActions}><Button variant="secondary" fullWidth onClick={() => setEditing(null)}>CancelÂ·la</Button><Button type="submit" fullWidth>Desa</Button></div></form></article>}
+    {message && <p className={styles.successCard} role="status">{message}</p>}
+    <div className={styles.listCard}>{data.goals.map((goal) => {
+      const used = data.movements.some((movement) => movement.goalId === goal.id) || data.recurrences.some((recurrence) => recurrence.linkedGoalId === goal.id);
+      const account = data.accounts.find((item) => item.id === goal.accountId);
+      return <article className={styles.movement} key={goal.id}><span className={styles.movementIcon}><Icon name="goal" /></span><div><b>{goal.name}</b><small>{account?.name ?? "Sense compte"} Â· objectiu {formatMoney(goal.targetAmount)} Â· {used ? "amb historial" : "sense Ãºs"}</small></div><aside><Badge tone={goal.archived ? "neutral" : "success"}>{goal.archived ? "Tancat" : "Actiu"}</Badge><span className={styles.rowActions}><button onClick={() => setEditing(goal)}>Edita</button><button onClick={() => update((current) => ({ ...current, goals: current.goals.map((item) => item.id === goal.id ? { ...item, archived: !item.archived } : item) }))}>{goal.archived ? "Reactivar" : "Tancar"}</button><button onClick={() => { if (used) return setMessage("Aquest objectiu tÃ© historial. Pots tancar-lo, perÃ² no eliminar-lo."); if (confirm("Vols eliminar definitivament aquest objectiu?")) { update((current) => ({ ...current, goals: current.goals.filter((item) => item.id !== goal.id) })); setMessage("Objectiu eliminat correctament."); } }}>Elimina</button></span></aside></article>;
+    })}</div>
+  </Screen>;
+}
+
+function AccountsSettings() {
+  const { data } = useAppStore();
+  return <Screen title="Comptes" eyebrow="PreferÃ¨ncies dels comptes" backHref="/configuracio" action={<Link href="/comptes/nou"><Button leadingIcon={<Icon name="add" />}>Crear compte</Button></Link>}>
+    <article className={styles.statCard}><p>Per editar un compte, obreâ€™l amb â€œEditaâ€. Si no tÃ© moviments ni vincles, el podrÃ s eliminar definitivament. Si tÃ© historial, el podrÃ s arxivar o tancar.</p></article>
+    <List>{data.accounts.map((account) => <ListItem key={account.id} title={account.name} subtitle={account.archived ? "Arxivat Â· conserva historial" : "Actiu"} trailing={<Link href={`/comptes/${account.id}/editar`}><Button size="small" variant="secondary">Edita</Button></Link>} />)}</List>
+  </Screen>;
+}
+
+export function SettingsSection({ section, title }: { section: string; title: string; items: string[] }) {
+  const { theme, setTheme } = useTheme();
+  const { update, resetDemo, clearAll, resetGerardInitial } = useAppStore();
+  const [message, setMessage] = useState("");
+  if (section === "recurrencies") return <RecurrencesSettings />;
+  if (section === "copies-de-seguretat") return <BackupSettings />;
+  if (section === "installar-iphone") return <InstallIPhoneSettings />;
+  if (section === "persones") return <PeopleSettings />;
+  if (section === "categories") return <CategoriesSettings />;
+  if (section === "subcategories") return <SubcategoriesSettings />;
+  if (section === "objectius") return <GoalsSettings />;
+  if (section === "comptes") return <AccountsSettings />;
+  if (section === "tema") return <Screen title={title} eyebrow="AparenÃ§a" backHref="/configuracio"><div className={styles.settingsList}>{themeOptions.map((option) => <button className={`${styles.settingsLink} ${theme === option.value ? styles.chipActive : ""}`} key={option.value} onClick={() => { setTheme(option.value); update((current) => ({ ...current, preferences: { ...current.preferences, theme: option.value } })); }}><span><Icon name={option.value === "dark" ? "eye-off" : "eye"} /></span><div><b>{option.label}</b><small>{option.value === "system" ? "Segueix el dispositiu" : "PreferÃ¨ncia fixa"}</small></div>{theme === option.value && <Icon name="check" />}</button>)}</div></Screen>;
+  if (section === "dades-de-prova") return <Screen title={title} eyebrow="Dades locals" backHref="/configuracio"><article className={styles.statCard}><p>Pots recuperar la demo, restaurar la plantilla Gerard o esborrar-ho tot per tornar a lâ€™onboarding.</p><div className={styles.settingsList}><Button onClick={() => { if (confirm("Vols restablir totes les dades de demo?")) { resetDemo(); setMessage("Dades de demo restablertes."); } }}>Restableix la demo</Button><Button onClick={() => { if (confirm("AixÃ² restaurarÃ  la plantilla Gerard: persones, comptes, categories, subcategories i recurrÃ¨ncies mensuals base. Ã‰s una plantilla inicial, no una limitaciÃ³ de lâ€™app. Vols continuar?")) { resetGerardInitial(); setMessage("Plantilla Gerard restaurada."); } }}>Restablir plantilla Gerard</Button><Button variant="danger" onClick={() => { if (confirm("Segur que vols esborrar totes les dades locals? Aquesta acciÃ³ no es pot desfer.")) { clearAll(); setMessage("Totes les dades locals sâ€™han esborrat."); } }}>Esborrar totes les dades</Button></div>{message && <p role="status">{message}</p>}</article></Screen>;
+  return <Screen title={title} eyebrow="GestiÃ³ local" backHref="/configuracio"><p className={styles.empty}>Aquesta secciÃ³ encara no tÃ© opcions configurables.</p></Screen>;
+}

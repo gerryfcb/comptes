@@ -1,0 +1,17 @@
+.banner {
+  position: fixed;
+  right: max(var(--space-4), env(safe-area-inset-right));
+  bottom: calc(var(--nav-height) + env(safe-area-inset-bottom) + var(--space-3));
+  left: max(var(--space-4), env(safe-area-inset-left));
+  z-index: 40;
+  width: min(42rem, calc(100% - (var(--space-4) * 2)));
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 38%, var(--color-border));
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-warning-soft) 92%, var(--color-surface-solid));
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
