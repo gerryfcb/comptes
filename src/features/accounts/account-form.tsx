@@ -2,14 +2,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
-import { Button, Input, type IconName } from "@/design-system";
+import { BottomSheet, Button, Input, type IconName } from "@/design-system";
 import { Screen } from "@/components/screen";
 import { newId, type AccountType } from "@/lib/app-data";
 import { useAppStore } from "@/lib/app-store";
+import { COLOR_PALETTE } from "@/lib/color-palette";
 import styles from "../shared.module.css";
 
 const accountTypes: Array<[AccountType, string]> = [["personal", "Personal"], ["shared", "Compartit"], ["saving", "Estalvi"], ["goal", "Objectiu"], ["other", "Altre"]];
-const colors = [["blue", "Blau"], ["violet", "Violeta"], ["green", "Verd"], ["orange", "Taronja"]];
 const icons: Array<[IconName, string]> = [["wallet", "Cartera"], ["accounts", "Comptes"], ["saving", "Estalvi"], ["goal", "Objectiu"]];
 
 export function AccountForm({ title, action, accountId }: { title: string; action: string; accountId?: string }) {
@@ -17,11 +17,22 @@ export function AccountForm({ title, action, accountId }: { title: string; actio
   const router = useRouter();
   const account = useMemo(() => data.accounts.find((item) => item.id === accountId), [data.accounts, accountId]);
   const [error, setError] = useState("");
+  const [personSheet, setPersonSheet] = useState(false);
+  const [newPersonName, setNewPersonName] = useState("");
+  const [newPersonColor, setNewPersonColor] = useState("violet");
+  const [createdOwnerIds, setCreatedOwnerIds] = useState<string[]>([]);
   const hasMovements = account ? data.movements.some((movement) => movement.accountId === account.id || movement.destinationAccountId === account.id) : false;
   const hasRecurrences = account ? data.recurrences.some((recurrence) => recurrence.sourceAccountId === account.id || recurrence.destinationAccountId === account.id) : false;
   const hasGoals = account ? data.goals.some((goal) => goal.accountId === account.id) : false;
   const canDelete = Boolean(account) && !hasMovements && !hasRecurrences && !hasGoals;
   const owners = data.people.filter((person) => !person.archived || account?.ownerIds.includes(person.id));
+
+  function createPerson() {
+    const name = newPersonName.trim(); if (!name) return setError("Escriu el nom de la persona.");
+    const id = newId("person");
+    update((current) => ({ ...current, people:[...current.people,{ id, name, color:newPersonColor, archived:false }] }));
+    setCreatedOwnerIds((current) => [...current,id]); setNewPersonName(""); setPersonSheet(false); setError("");
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,9 +78,9 @@ export function AccountForm({ title, action, accountId }: { title: string; actio
       <Input label="Nom" name="name" defaultValue={account?.name} placeholder="Nom del compte" required />
       <label className={styles.selectField}>Tipus<select name="type" defaultValue={account?.type ?? "personal"}>{accountTypes.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
       <Input label="Saldo inicial" name="initialBalance" defaultValue={account?.initialBalance ?? 0} type="number" step="0.01" required hint={hasMovements ? "Aquest compte ja té moviments. Canviar el saldo inicial modificarà el saldo actual; fes-ho només si estàs corregint el punt de partida." : undefined} />
-      <fieldset className={styles.fieldset}><legend>Propietaris</legend>{owners.map((person) => <label key={person.id}><input type="checkbox" name="owners" value={person.id} defaultChecked={account?.ownerIds.includes(person.id)} /> {person.name}{person.archived ? " · arxivada" : ""}</label>)}</fieldset>
+      <fieldset className={styles.fieldset}><legend>Propietaris</legend>{owners.map((person) => <label key={person.id}><input type="checkbox" name="owners" value={person.id} defaultChecked={account?.ownerIds.includes(person.id) || createdOwnerIds.includes(person.id)} /> {person.name}{person.archived ? " · arxivada" : ""}</label>)}<Button type="button" size="small" variant="secondary" onClick={() => setPersonSheet(true)}>+ Crear persona</Button></fieldset>
       <Input label="Percentatge atribuïble" name="share" defaultValue={account?.attributablePercentage ?? 100} type="number" min="0" max="100" />
-      <label className={styles.selectField}>Color<select name="color" defaultValue={account?.color ?? "blue"}>{colors.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+      <label className={styles.selectField}>Color<select name="color" defaultValue={account?.color ?? "blue"}>{COLOR_PALETTE.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
       <label className={styles.selectField}>Icona<select name="icon" defaultValue={account?.icon ?? "wallet"}>{icons.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
       {error && <p className={styles.error} role="alert">{error}</p>}
       {account && <article className={styles.statCard}>
@@ -81,5 +92,6 @@ export function AccountForm({ title, action, accountId }: { title: string; actio
       </article>}
       <div className={styles.formActions}><Link href="/comptes"><Button variant="secondary" fullWidth>Cancel·la</Button></Link><Button type="submit" fullWidth>{action}</Button></div>
     </form>
+    <BottomSheet open={personSheet} title="Crear persona" description="Quedarà seleccionada com a propietària del compte." onClose={() => setPersonSheet(false)}><div className={styles.form}><Input label="Nom" value={newPersonName} onChange={(event) => setNewPersonName(event.target.value)} /><label className={styles.selectField}>Color<select value={newPersonColor} onChange={(event) => setNewPersonColor(event.target.value)}>{COLOR_PALETTE.map(([value,label]) => <option value={value} key={value}>{label}</option>)}</select></label><Button onClick={createPerson}>Crear i seleccionar</Button></div></BottomSheet>
   </Screen>;
 }

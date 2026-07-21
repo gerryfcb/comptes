@@ -11,9 +11,10 @@ import styles from "../shared.module.css";
 const sameMonth = (value: string, date = new Date()) => { const d = new Date(`${value}T12:00:00`); return d.getMonth() === date.getMonth() && d.getFullYear() === date.getFullYear(); };
 function Amount({ value, hidden }: { value: number; hidden: boolean }) { return <>{hidden ? "••••••" : formatMoney(value)}</>; }
 
-export function HomeView({ date, recurrencesGenerated = false }: { date: string; recurrencesGenerated?: boolean }) {
+export function HomeView({ date, recurrencesGenerated = false, onboardingDone = false }: { date: string; recurrencesGenerated?: boolean; onboardingDone?: boolean }) {
   const router = useRouter();
   const [showGeneratedMessage, setShowGeneratedMessage] = useState(recurrencesGenerated);
+  const [showWelcome, setShowWelcome] = useState(onboardingDone);
   const [backupReminder, setBackupReminder] = useState(false);
   const { data, update } = useAppStore(); const hidden = data.preferences.amountsHidden;
   const pending = pendingRecurrences(data);
@@ -28,14 +29,22 @@ export function HomeView({ date, recurrencesGenerated = false }: { date: string;
     return () => window.clearTimeout(timeout);
   }, [recurrencesGenerated, router]);
   useEffect(() => {
+    if (!onboardingDone) return;
+    router.replace("/");
+    const timeout = window.setTimeout(() => setShowWelcome(false), 4500);
+    return () => window.clearTimeout(timeout);
+  }, [onboardingDone, router]);
+  useEffect(() => {
     const lastBackup = localStorage.getItem(LAST_BACKUP_KEY);
     const postponed = localStorage.getItem("comptes-backup-reminder-after");
     const dueByDate = !lastBackup || Date.now() - new Date(lastBackup).getTime() > 30 * 24 * 60 * 60 * 1000;
     const canShow = !postponed || Date.now() > new Date(postponed).getTime();
-    setBackupReminder(data.movements.length >= 20 && dueByDate && canShow);
+    const timeout = window.setTimeout(() => setBackupReminder(data.movements.length >= 20 && dueByDate && canShow), 0);
+    return () => window.clearTimeout(timeout);
   }, [data.movements.length]);
   return <Screen eyebrow={date} title={`Bon dia, ${data.people[0]?.name ?? "!"}`} action={<Link href="/configuracio"><IconButton label="Configuració" variant="secondary"><Icon name="settings" /></IconButton></Link>}>
     {showGeneratedMessage && <article className={styles.successCard}><h2>Moviments recurrents generats</h2><p>Els saldos, moviments i estadístiques ja estan actualitzats.</p></article>}
+    {showWelcome && <article className={styles.successCard}><h2>Configuració completada</h2><p>Ja pots començar a utilitzar Comptes.</p></article>}
     {backupReminder && <article className={styles.noticeCard}><div><h2>Convé fer una còpia de seguretat</h2><p>Les dades només són en aquest dispositiu.</p></div><Link className={styles.reviewButton} href="/configuracio/copies-de-seguretat">Fer còpia</Link><button type="button" onClick={() => { const later = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); localStorage.setItem("comptes-backup-reminder-after", later); setBackupReminder(false); }}>Recorda-m’ho més endavant</button></article>}
     {pending.length > 0 && <article className={styles.noticeCard}><div><h2>Tens moviments recurrents pendents</h2><p>{pending.length} moviments preparats per revisar i generar aquest mes.</p></div><Link className={styles.reviewButton} href="/recurrencies-pendents">Revisar</Link></article>}
     <section className={styles.hero}><div className={styles.heroTop}><span>Patrimoni atribuïble</span><IconButton label={hidden ? "Mostrar imports" : "Ocultar imports"} className={styles.glassButton} onClick={() => update((s) => ({ ...s, preferences: { ...s.preferences, amountsHidden: !hidden } }))}><Icon name={hidden ? "eye-off" : "eye"} /></IconButton></div><strong className={styles.heroAmount}><Amount value={wealth} hidden={hidden} /></strong><p>Calculat segons el percentatge de cada compte</p></section>

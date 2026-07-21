@@ -27,10 +27,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       // Hydrate the client repository once after mount.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (stored) {
         const checked = validateAppData(JSON.parse(stored) as unknown);
         if (!checked.valid) throw new Error(checked.reason);
+        // Hydrate the client repository once after mount.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setData(checked.data);
       }
     } catch {

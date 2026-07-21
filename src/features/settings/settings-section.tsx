@@ -5,6 +5,8 @@ import { Badge, Button, Icon, Input, List, ListItem, useTheme, type IconName, ty
 import { Screen } from "@/components/screen";
 import { currentIsoDate, formatMoney, newId, type Category, type Goal, type Person, type Recurrence, type RecurrenceMovementType, type Subcategory } from "@/lib/app-data";
 import { backupFilename, createBackup, readBackup } from "@/lib/backup";
+import { CATEGORY_LIBRARY, activateLibraryCategories, isLibraryCategoryActive } from "@/lib/category-library";
+import { COLOR_PALETTE } from "@/lib/color-palette";
 import { LAST_BACKUP_KEY, useAppStore } from "@/lib/app-store";
 import styles from "../shared.module.css";
 
@@ -15,7 +17,7 @@ const recurrenceTypes: Array<{ value: RecurrenceMovementType; label: string }> =
   { value: "expense", label: "Despesa" }, { value: "income", label: "Ingrés" }, { value: "transfer", label: "Transferència" },
   { value: "goalContribution", label: "Aportació a objectiu" }, { value: "goalWithdrawal", label: "Retirada d’objectiu" },
 ];
-const colors = [["blue", "Blau"], ["violet", "Violeta"], ["green", "Verd"], ["orange", "Taronja"]];
+const colors = COLOR_PALETTE;
 const icons: Array<[IconName, string]> = [["wallet", "Cartera"], ["shopping", "Compres"], ["transport", "Transport"], ["income", "Ingrés"], ["saving", "Estalvi"], ["goal", "Objectiu"], ["filter", "Filtre"]];
 function RecurrenceForm({ recurrence, onCancel }: { recurrence?: Recurrence; onCancel: () => void }) {
   const { data, update } = useAppStore();
@@ -156,6 +158,7 @@ function CategoriesSettings() {
   const { data, update } = useAppStore();
   const [editing, setEditing] = useState<Category | "new" | null>(null);
   const [message, setMessage] = useState("");
+  const [tab, setTab] = useState<"mine" | "library">("mine");
   const save = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -166,13 +169,16 @@ function CategoriesSettings() {
     setEditing(null); setMessage("Categoria desada correctament.");
   };
   return <Screen title="Categories" eyebrow="Gestió local" backHref="/configuracio" action={<Button leadingIcon={<Icon name="add" />} onClick={() => setEditing("new")}>Afegir</Button>}>
+    <div className={styles.tabs} role="tablist"><button className={tab === "mine" ? styles.chipActive : ""} onClick={() => setTab("mine")}>Les meves categories</button><button className={tab === "library" ? styles.chipActive : ""} onClick={() => setTab("library")}>Biblioteca</button></div>
+    {tab === "library" && <><article className={styles.statCard}><p>Activa un grup amb un toc. S’afegirà la categoria principal i les seves subcategories sense duplicar les que ja tens.</p><div className={styles.inlineActions}><Button size="small" onClick={() => { update((current) => activateLibraryCategories(current, CATEGORY_LIBRARY.filter((item) => item.recommended).map((item) => item.id))); setMessage("Categories recomanades activades."); }}>Activar recomanades</Button></div></article><div className={styles.libraryGrid}>{CATEGORY_LIBRARY.map((item) => { const active = isLibraryCategoryActive(data,item); return <button className={active ? styles.choiceActive : ""} key={item.id} onClick={() => { update((current) => activateLibraryCategories(current,[item.id])); setMessage(active ? `${item.name} ja estava activa.` : `${item.name} activada.`); }}><Icon name={item.icon} /><span>{item.name}<small>{active ? "Activa" : `${item.subcategories.length} subcategories`}</small></span></button>; })}</div></>}
+    {tab === "mine" && <>
     {editing && <article className={styles.statCard}><form className={styles.form} onSubmit={save}><Input label="Nom" name="name" defaultValue={editing === "new" ? "" : editing.name} required /><label className={styles.selectField}>Tipus<select name="kind" defaultValue={editing === "new" ? "expense" : editing.kind ?? "expense"}><option value="expense">Despesa</option><option value="income">Ingrés</option><option value="both">Ambdós</option></select></label><label className={styles.selectField}>Color<select name="color" defaultValue={editing === "new" ? "blue" : editing.color ?? "blue"}>{colors.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><label className={styles.selectField}>Icona<select name="icon" defaultValue={editing === "new" ? "wallet" : editing.icon}>{icons.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><Input label="Ordre" name="order" type="number" defaultValue={editing === "new" ? data.categories.length + 1 : editing.order ?? 1} /><div className={styles.formActions}><Button variant="secondary" fullWidth onClick={() => setEditing(null)}>Cancel·la</Button><Button type="submit" fullWidth>Desa</Button></div></form></article>}
     {message && <p className={styles.successCard} role="status">{message}</p>}
     <div className={styles.listCard}>{[...data.categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((category) => {
       const used = data.movements.some((movement) => movement.categoryId === category.id);
       const hasSubcategories = data.subcategories.some((subcategory) => subcategory.categoryId === category.id);
       return <article className={styles.movement} key={category.id}><span className={`${styles.movementIcon} ${styles[category.color ?? "blue"]}`}><Icon name={category.icon} /></span><div><b>{category.name}</b><small>{category.kind === "income" ? "Ingrés" : category.kind === "both" ? "Ambdós" : "Despesa"} · {used ? "amb moviments" : hasSubcategories ? "amb subcategories" : "sense ús"} · {category.archived ? "arxivada" : "activa"}</small></div><aside><Badge tone={category.archived ? "neutral" : "success"}>{category.archived ? "Arxivada" : "Activa"}</Badge><span className={styles.rowActions}><button onClick={() => setEditing(category)}>Edita</button><button onClick={() => update((current) => ({ ...current, categories: current.categories.map((item) => item.id === category.id ? { ...item, archived: !item.archived } : item) }))}>{category.archived ? "Desarxiva" : "Arxiva"}</button><button onClick={() => { if (used || hasSubcategories) return setMessage("No pots eliminar aquesta categoria perquè ja té moviments o subcategories associades. Pots arxivar-la."); if (confirm("Vols eliminar definitivament aquesta categoria?")) { update((current) => ({ ...current, categories: current.categories.filter((item) => item.id !== category.id) })); setMessage("Categoria eliminada correctament."); } }}>Elimina</button></span></aside></article>;
-    })}</div>
+    })}</div></>}
   </Screen>;
 }
 
