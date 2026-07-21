@@ -37,6 +37,24 @@ export type AppData = {
   recurrences: Recurrence[]; preferences: Preferences;
 };
 
+export const APP_DATA_VERSION = 1;
+
+export type AppDataValidation = { valid: true; data: AppData } | { valid: false; reason: string };
+
+export function validateAppData(value: unknown): AppDataValidation {
+  if (!value || typeof value !== "object") return { valid: false, reason: "La còpia no conté dades vàlides." };
+  const data = value as Partial<AppData>;
+  if (data.version !== APP_DATA_VERSION) return { valid: false, reason: "La versió de la còpia no és compatible amb aquesta app." };
+  const required: Array<keyof AppData> = ["people", "accounts", "categories", "subcategories", "goals", "movements", "recurrences"];
+  if (required.some((key) => !Array.isArray(data[key]))) return { valid: false, reason: "La còpia és incompleta: hi falten dades necessàries." };
+  if (!data.preferences || typeof data.preferences !== "object") return { valid: false, reason: "La còpia és incompleta: hi falta la configuració." };
+  const invalidMovement = data.movements!.some((movement) =>
+    !movement || typeof movement.id !== "string" || !["income", "expense", "transfer", "saving"].includes(movement.kind) ||
+    !Number.isFinite(movement.amount) || movement.amount <= 0 || typeof movement.date !== "string");
+  if (invalidMovement) return { valid: false, reason: "La còpia conté moviments incomplets o incorrectes." };
+  return { valid: true, data: normalizeAppData(data as AppData) };
+}
+
 const categoryData: Array<[string, string[]]> = [
   ["Vehicle", ["Combustible", "Pàrquing", "Manteniment", "ITV", "Assegurança", "Impost de circulació", "Altres"]],
   ["Alimentació", ["Supermercat", "Esmorzar", "Berenar", "Restaurant", "Menjar per emportar", "Bars", "Altres"]],
@@ -149,6 +167,10 @@ export function accountBalance(account: Account, movements: Movement[]) {
   return movements.reduce((balance, movement) => {
     if (movement.kind === "income" && movement.accountId === account.id) return balance + movement.amount;
     if (movement.kind === "expense" && movement.accountId === account.id) return balance - movement.amount;
+    if (movement.kind === "saving" && movement.savingDirection === "withdrawal") {
+      if (movement.accountId === account.id) return balance + movement.amount;
+      if (movement.destinationAccountId === account.id) return balance - movement.amount;
+    }
     if ((movement.kind === "transfer" || movement.kind === "saving") && movement.accountId === account.id) return balance - movement.amount;
     if ((movement.kind === "transfer" || movement.kind === "saving") && movement.destinationAccountId === account.id) return balance + movement.amount;
     return balance;
@@ -165,11 +187,9 @@ export function compareMovementsDesc(a: Movement, b: Movement) {
 }
 
 export function normalizeAppData(data: AppData): AppData {
-  const recurrences = Array.isArray(data.recurrences) ? data.recurrences : [];
-  const hasBaseAccounts = data.accounts.some((account) => account.id === "account-personal");
   return {
     ...data,
-    recurrences: recurrences.length === 0 && hasBaseAccounts ? createInitialRecurrences() : recurrences,
+    recurrences: data.recurrences,
     people: data.people.map((person) => ({ ...person, archived: person.archived ?? false })),
     accounts: data.accounts.map((account) => ({ ...account, archived: account.archived ?? false })),
     categories: data.categories.map((category, index) => ({ ...category, color: category.color ?? "blue", kind: category.kind ?? "expense", order: category.order ?? index + 1, archived: category.archived ?? false })),

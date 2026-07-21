@@ -2,31 +2,17 @@
 import { useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { Button, Input } from "@/design-system";
 import { Screen } from "@/components/screen";
-import { createStarterData, type AppData } from "@/lib/app-data";
+import { createStarterData } from "@/lib/app-data";
+import { readBackup } from "@/lib/backup";
 import { useAppStore } from "@/lib/app-store";
 import styles from "../shared.module.css";
 
-type BackupFile = { formatVersion?: number; exportedAt?: string; data?: AppData };
-
-function isAppData(value: unknown): value is AppData {
-  const data = value as AppData;
-  return Boolean(data && data.version === 1 && Array.isArray(data.people) && Array.isArray(data.accounts) && Array.isArray(data.movements) && Array.isArray(data.recurrences));
-}
-
-function extractAppData(value: unknown) {
-  if (isAppData(value)) return value;
-  const backup = value as BackupFile;
-  if (backup && isAppData(backup.data)) return backup.data;
-  return null;
-}
-
 export function OnboardingGate({ children }: { children: ReactNode }) {
-  const { data, ready, resetGerardInitial, replaceData } = useAppStore();
+  const { data, ready, corruptData, resetGerardInitial, replaceData } = useAppStore();
   const [mode, setMode] = useState<"menu" | "zero" | "import">("menu");
   const [error, setError] = useState("");
-  const needsOnboarding = ready && data.people.length === 0 && data.accounts.length === 0 && data.movements.length === 0;
+  const needsOnboarding = ready && !corruptData && data.people.length === 0 && data.accounts.length === 0 && data.movements.length === 0;
   if (!ready) return null;
-  if (!needsOnboarding) return <>{children}</>;
 
   const importBackup = async (event: ChangeEvent<HTMLInputElement>) => {
     setError("");
@@ -34,14 +20,17 @@ export function OnboardingGate({ children }: { children: ReactNode }) {
     if (!file) return;
     try {
       const parsed = JSON.parse(await file.text()) as unknown;
-      const imported = extractAppData(parsed);
-      if (!imported) return setError("El fitxer no té el format correcte de còpia de seguretat.");
+      const imported = readBackup(parsed);
+      if (!imported.valid) return setError(imported.reason);
       if (!confirm("Aquesta importació substituirà les dades locals actuals. Vols continuar?")) return;
-      replaceData(imported);
+      replaceData(imported.data);
     } catch {
       setError("No s’ha pogut llegir el fitxer JSON.");
     }
   };
+
+  if (corruptData) return <Screen title="Cal recuperar les dades" eyebrow="Les dades originals no s’han esborrat"><article className={styles.statCard}><p>No s’han pogut llegir les dades guardades en aquest dispositiu. Per seguretat, Comptes no les substituirà per una plantilla ni per un estat buit.</p><p>Importa una còpia de seguretat vàlida per continuar.</p><Input label="Importar còpia de seguretat" type="file" accept="application/json,.json" onChange={importBackup} />{error && <p className={styles.errorText} role="alert">{error}</p>}</article></Screen>;
+  if (!needsOnboarding) return <>{children}</>;
 
   const startEmpty = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

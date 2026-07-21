@@ -1,13 +1,14 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { createDemoData, createEmptyData, createInitialGerardData, normalizeAppData, type AppData } from "./app-data";
+import { createDemoData, createEmptyData, createInitialGerardData, normalizeAppData, validateAppData, type AppData } from "./app-data";
 export { formatMoney } from "./app-data";
 
 const STORAGE_KEY = "comptes-data-v1";
 const CORRUPT_STORAGE_KEY = "comptes-data-v1-corrupt";
+export const LAST_BACKUP_KEY = "comptes-last-backup-at";
 type Store = {
-  data: AppData; ready: boolean; storageError: string; update: (recipe: (current: AppData) => AppData) => void;
+  data: AppData; ready: boolean; storageError: string; corruptData: boolean; update: (recipe: (current: AppData) => AppData) => void;
   resetDemo: () => void; clearAll: () => void;
   resetGerardInitial: () => void; replaceData: (next: AppData) => void;
 };
@@ -21,17 +22,24 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(() => createEmptyData());
   const [ready, setReady] = useState(false);
   const [storageError, setStorageError] = useState("");
+  const [corruptData, setCorruptData] = useState(false);
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       // Hydrate the client repository once after mount.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (stored) setData(normalizeAppData(JSON.parse(stored) as AppData));
+      if (stored) {
+        const checked = validateAppData(JSON.parse(stored) as unknown);
+        if (!checked.valid) throw new Error(checked.reason);
+        setData(checked.data);
+      }
     } catch {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) localStorage.setItem(CORRUPT_STORAGE_KEY, stored);
-      localStorage.removeItem(STORAGE_KEY);
-      setStorageError("Les dades locals no es podien llegir. S'ha creat un estat net i s'ha conservat una copia tecnica de recuperacio al dispositiu.");
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) localStorage.setItem(CORRUPT_STORAGE_KEY, stored);
+      } catch { /* Preserve the original key at all costs. */ }
+      setCorruptData(true);
+      setStorageError("No s’han pogut llegir les dades locals. No s’han esborrat: importa una còpia de seguretat per recuperar l’app.");
     }
     setReady(true);
   }, []);
@@ -42,7 +50,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         writeLocalData(next);
         setStorageError("");
       } catch {
-        setStorageError("No s'han pogut desar les dades en aquest dispositiu. Exporta una copia abans de continuar.");
+        setStorageError("No s’han pogut desar les dades en aquest dispositiu. Exporta una còpia abans de continuar.");
+        return current;
       }
     }
     return next;
@@ -53,16 +62,22 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       writeLocalData(normalized);
       setStorageError("");
     } catch {
-      setStorageError("No s'han pogut desar les dades en aquest dispositiu. Exporta una copia abans de continuar.");
+      setStorageError("No s’han pogut desar les dades en aquest dispositiu. Exporta una còpia abans de continuar.");
+      return;
     }
     setData(normalized);
+    setCorruptData(false);
   }, []);
   const value = useMemo(() => ({
-    data, ready, storageError, update, replaceData,
+    data, ready, storageError, corruptData, update, replaceData,
     resetDemo: () => replaceData(createDemoData()),
-    clearAll: () => { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(CORRUPT_STORAGE_KEY); setData(createEmptyData()); },
+    clearAll: () => {
+      try {
+        localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(CORRUPT_STORAGE_KEY); setData(createEmptyData()); setStorageError(""); setCorruptData(false);
+      } catch { setStorageError("No s’han pogut esborrar les dades d’aquest dispositiu."); }
+    },
     resetGerardInitial: () => replaceData(createInitialGerardData()),
-  }), [data, ready, storageError, update, replaceData]);
+  }), [data, ready, storageError, corruptData, update, replaceData]);
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>;
 }
 
