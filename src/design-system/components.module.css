@@ -36,6 +36,37 @@
 .hint { margin: 0; color: var(--color-text-secondary); font-size: var(--text-xs); }
 .error { color: var(--color-danger); }
 
+.choiceField { display: grid; gap: var(--space-3); margin: 0; padding: 0; border: 0; }
+.choiceField legend { margin-bottom: var(--space-2); color: var(--color-text); font-size: var(--text-sm); font-weight: 650; }
+.colorGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+.colorChoice,.iconChoice {
+  min-height: 3rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: var(--color-surface-solid);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  cursor: pointer;
+}
+.colorChoice[data-selected="true"],.iconChoice[data-selected="true"] {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+.colorDot { width: 1.1rem; height: 1.1rem; flex: 0 0 auto; border: 1px solid rgba(0,0,0,.14); border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255,255,255,.24); }
+.iconGroups { display: grid; gap: var(--space-4); }
+.iconGroups h3 { margin: 0 0 var(--space-2); color: var(--color-text-secondary); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .04em; }
+.iconGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+.iconChoice { min-height: 3.25rem; justify-content: flex-start; }
+.iconChoice span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .card { overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface-solid); box-shadow: var(--shadow-sm); }
 .cardElevated { background: var(--color-surface-elevated); box-shadow: var(--shadow-md); backdrop-filter: blur(var(--blur-surface)); }
 .cardInteractive { transition: transform var(--duration-fast), box-shadow var(--duration-fast); cursor: pointer; }

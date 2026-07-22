@@ -9,12 +9,16 @@ const sections = {
   recurrencies: { title: "Moviments recurrents", items: [] },
   persones: { title: "Persones", items: ["Gerard", "Ariadna"] },
   "copies-de-seguretat": { title: "Còpies de seguretat", items: [] },
+  "funcions-intelligents": { title: "Funcions intel·ligents", items: [] },
   "installar-iphone": { title: "Instal·lar a iPhone", items: [] },
   tema: { title: "Tema", items: [] },
   "dades-de-prova": { title: "Dades de prova", items: [] },
 } as const;
 
-export function generateStaticParams() { return Object.keys(sections).map((seccio) => ({ seccio })); }
+export function generateStaticParams() {
+  return Object.keys(sections).map((seccio) => ({ seccio }));
+}
+
 export default async function SettingsSectionPage({ params }: { params: Promise<{ seccio: string }> }) {
   const { seccio } = await params;
   const config = sections[seccio as keyof typeof sections];

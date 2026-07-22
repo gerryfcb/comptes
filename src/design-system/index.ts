@@ -8,5 +8,7 @@ export * from "./floating-action-button";
 export * from "./icon-button";
 export * from "./icons";
 export * from "./input";
+export * from "./money-input";
+export * from "./choice-pickers";
 export * from "./list";
 export * from "./theme-provider";

@@ -26,6 +26,12 @@
   --color-danger-soft: #ffe8eb;
   --color-focus: rgba(52, 87, 213, 0.32);
   --color-scrim: rgba(12, 12, 14, 0.42);
+  --palette-blue:#5277e6; --palette-navy:#294a82; --palette-sky:#3b8fc9; --palette-cyan:#168fa4;
+  --palette-teal:#168a82; --palette-green:#2a9c6c; --palette-emerald:#16845c; --palette-lime:#6e9329;
+  --palette-yellow:#a47c12; --palette-amber:#b56f13; --palette-orange:#d67a2c; --palette-coral:#cf6555;
+  --palette-red:#c94b50; --palette-rose:#c14e72; --palette-pink:#c34f91; --palette-fuchsia:#aa4ca8;
+  --palette-violet:#9465cb; --palette-purple:#784fc1; --palette-indigo:#555fc1; --palette-slate:#647184;
+  --palette-gray:#707070; --palette-brown:#8a654b;
 
   /* Typography: native Apple first, excellent everywhere. */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",

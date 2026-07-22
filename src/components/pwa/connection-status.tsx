@@ -32,6 +32,6 @@ export function ConnectionStatus() {
 
   if (storageError) return <div className={styles.banner} role="alert">{storageError}</div>;
   if (!online) return <div className={styles.banner} role="status">Sense connexio. Pots continuar utilitzant Comptes; les dades es guarden en aquest dispositiu.</div>;
-  if (recovered) return <div className={styles.banner} role="status">Connexio recuperada.</div>;
+  if (recovered) return <div className={styles.banner} role="status">Connexió recuperada.</div>;
   return null;
 }
