@@ -38,6 +38,14 @@
 
 .choiceField { display: grid; gap: var(--space-3); margin: 0; padding: 0; border: 0; }
 .choiceField legend { margin-bottom: var(--space-2); color: var(--color-text); font-size: var(--text-sm); font-weight: 650; }
+.compactPicker { display:grid; gap:var(--space-2); }
+.compactPickerLabel { color:var(--color-text); font-size:var(--text-sm); font-weight:650; }
+.compactPickerRow { min-height:3.5rem; width:100%; display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:var(--space-3); padding:0 var(--space-4); border:1px solid var(--color-border); border-radius:var(--radius-lg); color:var(--color-text); background:var(--color-surface-solid); font:inherit; text-align:left; cursor:pointer; }
+.compactPickerRow > svg:first-child { color:var(--color-primary); }
+.compactPickerRow > svg:last-child { color:var(--color-text-secondary); }
+.iconGroupList { display:grid; gap:var(--space-2); }
+.iconGroupList button,.pickerBack { min-height:3rem; display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); width:100%; padding:0 var(--space-3); border:1px solid var(--color-border); border-radius:var(--radius-md); color:var(--color-text); background:var(--color-surface-solid); font:inherit; font-weight:650; cursor:pointer; }
+.pickerBack { width:auto; margin-bottom:var(--space-4); color:var(--color-primary); border:0; background:transparent; }
 .colorGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
 .colorChoice,.iconChoice {
   min-height: 3rem;
@@ -108,6 +116,14 @@
 .sheetTitle { margin: 0; font-size: var(--text-xl); letter-spacing: var(--tracking-tight); }
 .sheetDescription { margin: var(--space-1) 0 0; color: var(--color-text-secondary); font-size: var(--text-sm); }
 .sheetBody { max-height: 60svh; overflow-y: auto; overscroll-behavior: contain; padding: 0 var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom)); }
+.dismissibleNotice { display:grid; grid-template-columns:auto 1fr auto; align-items:start; gap:var(--space-3); margin-bottom:var(--space-5); padding:var(--space-4); border:1px solid var(--color-border); border-radius:var(--radius-xl); background:var(--color-surface-solid); box-shadow:var(--shadow-sm); animation:noticeIn .22s var(--ease-standard) both; }
+.dismissibleNotice[data-tone="warning"] { border-color:color-mix(in srgb,var(--color-warning) 40%,var(--color-border)); background:var(--color-warning-soft); }
+.dismissibleNotice[data-tone="success"] { border-color:color-mix(in srgb,var(--color-success) 40%,var(--color-border)); background:color-mix(in srgb,var(--color-success) 10%,var(--color-surface-solid)); }
+.dismissibleNotice[data-tone="error"] { border-color:color-mix(in srgb,var(--color-danger) 40%,var(--color-border)); }
+.dismissibleNotice h2 { margin:0 0 2px; font-size:var(--text-lg); }.dismissibleNotice p { margin:0; color:var(--color-text-secondary); font-size:var(--text-sm); }
+.noticeIcon { color:var(--color-primary); }.noticeActions { display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:var(--space-3); }
+.noticeClose { width:2.75rem; height:2.75rem; display:grid; place-items:center; margin:-.5rem; border:0; border-radius:50%; color:var(--color-text-secondary); background:transparent; cursor:pointer; }
+@keyframes noticeIn { from { opacity:0; transform:translateY(-.35rem); } }
 
 .bottomNav { position: fixed; z-index: var(--z-nav); right: 0; bottom: 0; left: 0; min-height: calc(var(--nav-height) + env(safe-area-inset-bottom)); display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; padding: var(--space-2) max(var(--space-2), env(safe-area-inset-right)) env(safe-area-inset-bottom) max(var(--space-2), env(safe-area-inset-left)); border-top: 1px solid var(--color-border); background: var(--color-surface); backdrop-filter: blur(var(--blur-surface)) saturate(160%); }
 .navItem { min-width: 0; min-height: 3.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 0; border-radius: var(--radius-md); color: var(--color-text-tertiary); background: transparent; font-size: 0.68rem; font-weight: 600; text-decoration: none; cursor: pointer; }

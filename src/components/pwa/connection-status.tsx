@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { DismissibleNotice } from "@/design-system";
 import { useAppStore } from "@/lib/app-store";
 import styles from "./connection-status.module.css";
 
 export function ConnectionStatus() {
   const [online, setOnline] = useState(true);
   const [recovered, setRecovered] = useState(false);
+  const pathname = usePathname();
   const { storageError } = useAppStore();
 
   useEffect(() => {
@@ -31,7 +34,7 @@ export function ConnectionStatus() {
   }, []);
 
   if (storageError) return <div className={styles.banner} role="alert">{storageError}</div>;
-  if (!online) return <div className={styles.banner} role="status">Sense connexio. Pots continuar utilitzant Comptes; les dades es guarden en aquest dispositiu.</div>;
-  if (recovered) return <div className={styles.banner} role="status">Connexió recuperada.</div>;
+  if (!online && pathname === "/") return <div className={styles.notice}><DismissibleNotice id="offline" title="Sense connexió" message="Pots continuar utilitzant Comptes. Les funcions intel·ligents i les actualitzacions no estaran disponibles." tone="warning" /></div>;
+  if (recovered) return <div className={styles.toast} role="status">Connexió recuperada</div>;
   return null;
 }

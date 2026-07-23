@@ -249,7 +249,7 @@ function AccountsSettings() {
   const { data } = useAppStore();
   return <Screen title="Comptes" eyebrow="Preferències dels comptes" backHref="/configuracio" action={<Link href="/comptes/nou"><Button leadingIcon={<Icon name="add" />}>Crear compte</Button></Link>}>
     <article className={styles.statCard}><p>Per editar un compte, obre’l amb “Edita”. Si no té moviments ni vincles, el podràs eliminar definitivament. Si té historial, el podràs arxivar o tancar.</p></article>
-    <List>{data.accounts.map((account) => <ListItem key={account.id} title={account.name} subtitle={account.archived ? "Arxivat · conserva historial" : "Actiu"} trailing={<Link href={`/comptes/${account.id}/editar`}><Button size="small" variant="secondary">Edita</Button></Link>} />)}</List>
+    <List>{data.accounts.map((account) => <ListItem key={account.id} title={account.name} subtitle={account.archived ? "Arxivat · conserva historial" : "Actiu"} trailing={<Link href={`/comptes/editar?id=${account.id}`}><Button size="small" variant="secondary">Edita</Button></Link>} />)}</List>
   </Screen>;
 }
 

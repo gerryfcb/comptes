@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { Button, DismissibleNotice } from "@/design-system";
 import styles from "./connection-status.module.css";
 
 export function ServiceWorkerRegistration() {
@@ -20,5 +21,5 @@ export function ServiceWorkerRegistration() {
     return () => navigator.serviceWorker.removeEventListener("controllerchange", controllerChange);
   }, []);
   if (!waiting) return null;
-  return <div className={styles.banner} role="status">Hi ha una actualització disponible. <button type="button" onClick={() => waiting.postMessage({ type: "SKIP_WAITING" })}>Actualitzar</button></div>;
+  return <div className={styles.notice}><DismissibleNotice id="update-available" title="Actualització disponible" message="Pots aplicar la nova versió quan et vagi bé."><Button size="small" onClick={() => waiting.postMessage({ type: "SKIP_WAITING" })}>Actualitzar</Button></DismissibleNotice></div>;
 }

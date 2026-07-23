@@ -4,6 +4,7 @@ export * from "./bottom-sheet";
 export * from "./button";
 export * from "./card";
 export * from "./dialog";
+export * from "./dismissible-notice";
 export * from "./floating-action-button";
 export * from "./icon-button";
 export * from "./icons";

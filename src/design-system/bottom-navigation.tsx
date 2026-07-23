@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import type { IconName } from "./icons";
 import { Icon } from "./icons";
@@ -29,6 +31,11 @@ export function BottomNavigation({
             href={item.href}
             aria-current={active ? "page" : undefined}
             className={cx(styles.navItem, active && styles.navItemActive)}
+            onClick={(event) => {
+              if (navigator.onLine) return;
+              event.preventDefault();
+              window.location.assign(item.href);
+            }}
           >
             <Icon name={item.icon} size={22} />
             <span className={styles.navLabel}>{item.label}</span>
